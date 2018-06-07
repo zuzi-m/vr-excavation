@@ -1,6 +1,7 @@
 ﻿using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
+using VRTK;
 
 public class Excavation : MonoBehaviour {
 
@@ -13,28 +14,28 @@ public class Excavation : MonoBehaviour {
     private const int EXCAVATE_SIZE = 15;
     private const int EXCAVATE_SIZE_2 = EXCAVATE_SIZE / 2;
 
+    private bool isExcavating;
+    private float excavationModifier = -1.0f;
+
     // Use this for initialization
-    void Start () {}
+    void Start ()
+    {
+        GetComponent<VRTK_ControllerEvents>().TriggerPressed += new ControllerInteractionEventHandler(DoTriggerPressed);
+        GetComponent<VRTK_ControllerEvents>().TriggerReleased += new ControllerInteractionEventHandler(DoTriggerReleased);
+    }
 	
 	// Update is called once per frame
 	void Update ()
     {
         // EXCAVATION
-        if (Input.GetButton("Fire1") || Input.GetButton("Fire2"))
+        if (isExcavating)
         {
-            // decide whether adding or subtracting sand
-            float modifier = 1.0f;
-            if (Input.GetButton("Fire2"))
-            {
-                modifier = -1.0f;
-            }
-
             // do the ray cast to see where excavating
             RaycastHit hit;
-            Ray ray = new Ray(excavator.transform.position, excavator.transform.TransformDirection(Vector3.up));
+            Ray ray = new Ray(excavator.transform.position, excavator.transform.TransformDirection(Vector3.down));
             if (Physics.Raycast(ray, out hit, excavationReach))
             {
-                Debug.Log("ray cast hit at" + hit.point + " which is at uv " + hit.textureCoord + " and terrain has size " + seafloor.terrainData.size + " and heightmap width " + seafloor.terrainData.heightmapWidth);
+                //Debug.Log("ray cast hit at" + hit.point + " which is at uv " + hit.textureCoord + " and terrain has size " + seafloor.terrainData.size + " and heightmap width " + seafloor.terrainData.heightmapWidth);
 
                 // calculate the point where the ray hit by using UV coordinates and heightmap resolution
                 Vector3 hitpoint = new Vector3
@@ -69,7 +70,7 @@ public class Excavation : MonoBehaviour {
                         float sample_amount = Mathf.Clamp(1.0f - z, 0.0f, 1.0f);
 
                         // update samples by combining sample change amount, speed, time, and switch for add/subtract
-                        samples[i, j] = samples[i, j] + (sample_amount * modifier * excavationSpeed * Time.deltaTime);
+                        samples[i, j] = samples[i, j] + (sample_amount * excavationModifier * excavationSpeed * Time.deltaTime);
                     }
                 }
 
@@ -80,5 +81,16 @@ public class Excavation : MonoBehaviour {
                     samples);
             }
         }
+    }
+
+    private void DoTriggerPressed(object sender, ControllerInteractionEventArgs e)
+    {
+        excavationModifier = -1.0f;
+        isExcavating = true;
+    }
+
+    private void DoTriggerReleased(object sender, ControllerInteractionEventArgs e)
+    {
+        isExcavating = false;
     }
 }
