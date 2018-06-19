@@ -14,14 +14,20 @@ public class Excavation : MonoBehaviour {
     private const int EXCAVATE_SIZE = 15;
     private const int EXCAVATE_SIZE_2 = EXCAVATE_SIZE / 2;
 
-    private bool isExcavating;
+    private bool isExcavating = false;
     private float excavationModifier = -1.0f;
+
+    private float[,] startHeightmap;
 
     // Use this for initialization
     void Start ()
     {
         GetComponent<VRTK_ControllerEvents>().TriggerPressed += new ControllerInteractionEventHandler(DoTriggerPressed);
         GetComponent<VRTK_ControllerEvents>().TriggerReleased += new ControllerInteractionEventHandler(DoTriggerReleased);
+        GetComponent<VRTK_ControllerEvents>().GripPressed += new ControllerInteractionEventHandler(DoGripPressed);
+
+        // temporarily save the height map of terrain so that it wouldnt permanently change when excavating
+        startHeightmap = seafloor.terrainData.GetHeights(0, 0, seafloor.terrainData.heightmapWidth, seafloor.terrainData.heightmapWidth);
     }
 	
 	// Update is called once per frame
@@ -32,23 +38,19 @@ public class Excavation : MonoBehaviour {
         {
             // do the ray cast to see where excavating
             RaycastHit hit;
-            Ray ray = new Ray(excavator.transform.position, excavator.transform.TransformDirection(Vector3.down));
+            Ray ray = new Ray(excavator.transform.position, excavator.transform.TransformDirection(Vector3.up));
             if (Physics.Raycast(ray, out hit, excavationReach))
             {
                 //Debug.Log("ray cast hit at" + hit.point + " which is at uv " + hit.textureCoord + " and terrain has size " + seafloor.terrainData.size + " and heightmap width " + seafloor.terrainData.heightmapWidth);
 
                 // calculate the point where the ray hit by using UV coordinates and heightmap resolution
-                Vector3 hitpoint = new Vector3
-                {
-                    x = (hit.textureCoord.x * seafloor.terrainData.heightmapWidth),
-                    y = 1.0f,
-                    z = (hit.textureCoord.y * seafloor.terrainData.heightmapWidth)
-                };
+                int hitpointX = Mathf.CeilToInt(Mathf.Max(Mathf.Min((hit.textureCoord.x * seafloor.terrainData.heightmapWidth) - EXCAVATE_SIZE_2, seafloor.terrainData.heightmapWidth), 0.0f));
+                int hitpointY = Mathf.CeilToInt(Mathf.Max(Mathf.Min((hit.textureCoord.y * seafloor.terrainData.heightmapWidth) - EXCAVATE_SIZE_2, seafloor.terrainData.heightmapWidth), 0.0f));
 
                 // get the height samples from the right spot
                 float[,] samples = seafloor.terrainData.GetHeights(
-                    Mathf.CeilToInt(hitpoint.x)-EXCAVATE_SIZE_2,
-                    Mathf.CeilToInt(hitpoint.z)-EXCAVATE_SIZE_2,
+                    hitpointX,
+                    hitpointY,
                     EXCAVATE_SIZE,
                     EXCAVATE_SIZE);
 
@@ -76,8 +78,8 @@ public class Excavation : MonoBehaviour {
 
                 // update the height samples
                 seafloor.terrainData.SetHeights(
-                    Mathf.CeilToInt(hitpoint.x)-EXCAVATE_SIZE_2,
-                    Mathf.CeilToInt(hitpoint.z)-EXCAVATE_SIZE_2,
+                    hitpointX,
+                    hitpointY,
                     samples);
             }
         }
@@ -85,12 +87,22 @@ public class Excavation : MonoBehaviour {
 
     private void DoTriggerPressed(object sender, ControllerInteractionEventArgs e)
     {
-        excavationModifier = -1.0f;
         isExcavating = true;
     }
 
     private void DoTriggerReleased(object sender, ControllerInteractionEventArgs e)
     {
         isExcavating = false;
+    }
+
+    private void DoGripPressed(object sender, ControllerInteractionEventArgs e)
+    {
+        excavationModifier = -excavationModifier;
+    }
+
+    private void OnApplicationQuit()
+    {
+        // reset the height map back to how it was at start
+        seafloor.terrainData.SetHeights(0, 0, startHeightmap);
     }
 }
